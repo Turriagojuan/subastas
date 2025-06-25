@@ -35,26 +35,46 @@ class SubastaViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    // --- INICIO DE CAMBIOS ---
+
+    // 1. Guardar una lista completa de subastas para filtrar localmente.
+    private val allSubastas = mutableListOf<Subasta>()
+
     init {
+        // 2. Cargar todas las subastas al iniciar el ViewModel.
         loadSubastas()
     }
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
-        loadSubastas(query.ifBlank { null })
+        // 3. Filtrar la lista localmente en lugar de llamar a la API cada vez.
+        // La búsqueda no distingue entre mayúsculas y minúsculas y busca si el nombre "contiene" el texto.
+        val filteredList = if (query.isBlank()) {
+            allSubastas
+        } else {
+            allSubastas.filter { it.nombre.contains(query, ignoreCase = true) }
+        }
+        _subastasListState.value = UiState(data = filteredList)
     }
 
-    fun loadSubastas(query: String? = null) {
+    // 4. Se modifica loadSubastas para que no acepte una query y siempre cargue todo.
+    fun loadSubastas() {
         viewModelScope.launch {
             _subastasListState.value = UiState(isLoading = true)
-            val result = repository.getSubastas(query)
+            // Llamar al repositorio sin parámetros para obtener todas las subastas.
+            val result = repository.getSubastas(null)
             result.onSuccess { subastas ->
-                _subastasListState.value = UiState(data = subastas)
+                allSubastas.clear()
+                allSubastas.addAll(subastas)
+                _subastasListState.value = UiState(data = allSubastas)
             }.onFailure { error ->
                 _subastasListState.value = UiState(error = error.message)
             }
         }
     }
+
+    // --- FIN DE CAMBIOS ---
+
 
     fun loadSubastaDetail(id: Int) {
         viewModelScope.launch {
