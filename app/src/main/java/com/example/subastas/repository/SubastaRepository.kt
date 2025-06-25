@@ -49,11 +49,11 @@ class SubastaRepository @Inject constructor(private val apiService: ApiService) 
         }
     }
 
-    suspend fun crearSubasta(subasta: SubastaCreateRequest): Result<Subasta> {
+    suspend fun crearSubasta(subasta: SubastaCreateRequest): Result<Unit> {
         return try {
             val response = apiService.crearSubasta(subasta)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!)
+            if (response.isSuccessful) {
+                Result.success(Unit)
             } else {
                 Result.failure(Exception("Error al crear subasta: ${response.message()}"))
             }

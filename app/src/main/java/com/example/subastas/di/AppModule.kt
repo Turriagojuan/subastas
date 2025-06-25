@@ -20,7 +20,7 @@ object AppModule {
 
     // Es crucial que esta URL sea la correcta para tu servidor.
     // Si usas el emulador de Android, 10.0.2.2 apunta al localhost de tu máquina.
-    private const val BASE_URL = "http://10.0.2.2:3000/"
+    private const val BASE_URL = "https://magic-chambray-egret.glitch.me"
 
     @Provides
     @Singleton

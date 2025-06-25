@@ -18,7 +18,7 @@ interface ApiService {
     suspend fun realizarPuja(@Body puja: Puja): Response<Subasta>
 
     @POST("subastas")
-    suspend fun crearSubasta(@Body subasta: SubastaCreateRequest): Response<Subasta>
+    suspend fun crearSubasta(@Body subasta: SubastaCreateRequest): Response<Unit>
 
     @DELETE("subastas/{id}")
     suspend fun eliminarSubasta(@Path("id") id: Int): Response<Unit>
