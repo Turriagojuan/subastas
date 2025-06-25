@@ -2,7 +2,6 @@ package com.example.subastas.data.model
 
 import kotlinx.serialization.Serializable
 
-// Qué hace: Define la estructura de datos para una subasta.
 @Serializable
 data class Subasta(
     val id: Int,
@@ -10,5 +9,6 @@ data class Subasta(
     val fecha: String,
     val ofertaMaxima: Double,
     val inscritos: Int,
-    val imagenUrl: String? = null
+    val imagenUrl: String? = null,
+    val estado: String = "Abierta" // Puede ser "Abierta" o "Cerrada"
 )

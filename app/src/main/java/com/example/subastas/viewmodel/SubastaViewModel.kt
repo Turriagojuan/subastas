@@ -4,65 +4,155 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.subastas.data.model.Puja
 import com.example.subastas.data.model.Subasta
+import com.example.subastas.data.model.SubastaCreateRequest
 import com.example.subastas.repository.SubastaRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+import javax.inject.Inject
 
-// Qué hace: Contiene la lógica de la UI y gestiona el estado para las vistas de subastas.
-class SubastaViewModel(private val repository: SubastaRepository = SubastaRepository()) : ViewModel() {
+data class UiState<T>(
+    val data: T? = null,
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
 
-    // Flujo de estado para la lista de subastas
-    private val _subastasList = MutableStateFlow<List<Subasta>>(emptyList())
-    val subastasList: StateFlow<List<Subasta>> = _subastasList
+@HiltViewModel
+class SubastaViewModel @Inject constructor(
+    private val repository: SubastaRepository
+) : ViewModel() {
 
-    // Flujo de estado para el detalle de una subasta
-    private val _subastaDetail = MutableStateFlow<Subasta?>(null)
-    val subastaDetail: StateFlow<Subasta?> = _subastaDetail
+    private val _subastasListState = MutableStateFlow(UiState<List<Subasta>>())
+    val subastasListState: StateFlow<UiState<List<Subasta>>> = _subastasListState.asStateFlow()
 
-    // Flujo de estado para la búsqueda
-    val searchQuery = MutableStateFlow("")
+    private val _subastaDetailState = MutableStateFlow(UiState<Subasta>())
+    val subastaDetailState: StateFlow<UiState<Subasta>> = _subastaDetailState.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     init {
         loadSubastas()
     }
 
-    // Qué hace: Carga o busca subastas desde el repositorio.
+    fun onSearchQueryChanged(query: String) {
+        _searchQuery.value = query
+        loadSubastas(query.ifBlank { null })
+    }
+
     fun loadSubastas(query: String? = null) {
         viewModelScope.launch {
+            _subastasListState.value = UiState(isLoading = true)
             val result = repository.getSubastas(query)
-            _subastasList.value = result
+            result.onSuccess { subastas ->
+                _subastasListState.value = UiState(data = subastas)
+            }.onFailure { error ->
+                _subastasListState.value = UiState(error = error.message)
+            }
         }
     }
 
-    // Qué hace: Carga los detalles de una subasta específica.
     fun loadSubastaDetail(id: Int) {
         viewModelScope.launch {
-            _subastaDetail.value = repository.getSubastaDetail(id)
+            _subastaDetailState.value = UiState(isLoading = true)
+            val result = repository.getSubastaDetail(id)
+            result.onSuccess { subasta ->
+                _subastaDetailState.value = UiState(data = subasta)
+            }.onFailure { error ->
+                _subastaDetailState.value = UiState(error = error.message)
+            }
         }
     }
 
-    // Qué hace: Procesa el envío de una nueva puja.
-    fun realizarPuja(subastaId: Int, monto: Double) {
+    fun realizarPuja(subastaId: Int, montoStr: String, onResult: (Result<Unit>) -> Unit) {
+        val monto = montoStr.toDoubleOrNull()
+        if (monto == null || monto <= 0) {
+            onResult(Result.failure(Exception("El monto debe ser un número positivo.")))
+            return
+        }
+
+        val subastaActual = _subastaDetailState.value.data
+        if (subastaActual != null && monto <= subastaActual.ofertaMaxima) {
+            onResult(Result.failure(Exception("La puja debe ser mayor a la oferta máxima actual.")))
+            return
+        }
+
         viewModelScope.launch {
             val puja = Puja(subastaId, monto)
-            val success = repository.realizarPuja(puja)
-            if (success) {
-                // Si la puja es exitosa, recargamos los detalles para mostrar la nueva oferta máxima
-                loadSubastaDetail(subastaId)
+            val result = repository.realizarPuja(puja)
+            result.onSuccess { updatedSubasta ->
+                _subastaDetailState.value = UiState(data = updatedSubasta)
+                onResult(Result.success(Unit))
+            }.onFailure { error ->
+                onResult(Result.failure(error))
             }
         }
     }
 
-    // Qué hace: Crea una nueva subasta.
-    fun crearSubasta(nombre: String, fecha: String, ofertaMinima: Double, onResult: (Boolean) -> Unit) {
+    fun crearSubasta(
+        nombre: String,
+        fecha: String,
+        ofertaMinimaStr: String,
+        imagenUrl: String?,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        if (nombre.isBlank() || fecha.isBlank() || ofertaMinimaStr.isBlank()) {
+            onResult(Result.failure(Exception("Todos los campos son obligatorios.")))
+            return
+        }
+        val ofertaMinima = ofertaMinimaStr.toDoubleOrNull()
+        if (ofertaMinima == null || ofertaMinima <= 0) {
+            onResult(Result.failure(Exception("La oferta mínima debe ser un número positivo.")))
+            return
+        }
+        if (!isValidDate(fecha)) {
+            onResult(Result.failure(Exception("El formato de fecha debe ser dd-MM-yyyy.")))
+            return
+        }
+
         viewModelScope.launch {
-            try {
-                repository.crearSubasta(nombre, fecha, ofertaMinima)
-                onResult(true)
-            } catch (e: Exception) {
-                onResult(false)
+            val request = SubastaCreateRequest(nombre, fecha, ofertaMinima, imagenUrl)
+            val result = repository.crearSubasta(request)
+            result.onSuccess {
+                loadSubastas() // Recargar la lista
+                onResult(Result.success(Unit))
+            }.onFailure { error ->
+                onResult(Result.failure(error))
             }
+        }
+    }
+
+    fun eliminarSubasta(id: Int, onResult: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.eliminarSubasta(id)
+            onResult(result)
+        }
+    }
+
+    fun finalizarSubasta(id: Int, onResult: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            val result = repository.finalizarSubasta(id)
+            result.onSuccess { updatedSubasta ->
+                _subastaDetailState.value = UiState(data = updatedSubasta)
+                onResult(Result.success(Unit))
+            }.onFailure { error ->
+                onResult(Result.failure(error))
+            }
+        }
+    }
+
+    private fun isValidDate(dateStr: String): Boolean {
+        val format = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+        format.isLenient = false
+        return try {
+            format.parse(dateStr)
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }
