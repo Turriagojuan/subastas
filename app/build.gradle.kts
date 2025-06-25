@@ -1,11 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    // Aplicamos los plugins que necesitamos, incluyendo el de Compose
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlin.kapt)
-    alias(libs.plugins.hilt.android.gradle)
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23"
 }
 
 android {
@@ -14,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.subastas"
-        minSdk = 26
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -55,6 +52,7 @@ android {
 }
 
 dependencies {
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -75,20 +73,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-
-    // Hilt for Dependency Injection
-    implementation("com.google.dagger:hilt-android:2.51.1")
-    kapt("com.google.dagger:hilt-compiler:2.51.1")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-
-    // Coil for Image Loading
-    implementation("io.coil-kt:coil-compose:2.6.0")
-
-    // Icons
-    implementation("androidx.compose.material:material-icons-extended:1.6.7")
-
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -97,8 +81,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-}
-
-kapt {
-    correctErrorTypes = true
 }
